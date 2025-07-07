@@ -163,11 +163,12 @@ resources:
           RestrictPublicBuckets: true
 
     # CloudWatch Log Group with retention
-    ProfessionalMixerLogGroup:
-      Type: AWS::Logs::LogGroup
-      Properties:
-        LogGroupName: /aws/lambda/no-agenda-mixer-production-${self:provider.stage}-professionalMix
-        RetentionInDays: 30
+    # Note: Commented out as it already exists
+    # ProfessionalMixerLogGroup:
+    #   Type: AWS::Logs::LogGroup
+    #   Properties:
+    #     LogGroupName: /aws/lambda/no-agenda-mixer-production-${self:provider.stage}-professionalMix
+    #     RetentionInDays: 30
 
 plugins:
   - serverless-python-requirements

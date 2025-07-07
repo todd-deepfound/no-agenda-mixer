@@ -101,7 +101,7 @@ jobs:
           GROK_API_KEY: ${{ secrets.GROK_API_KEY }}
           FAL_API_KEY: ${{ secrets.FAL_API_KEY }}
         run: |
-          serverless deploy --config serverless-production.yml --stage prod
+          serverless deploy --config serverless-production.yml --stage prod --force
 
       - name: 🧪 Run smoke tests
         working-directory: ./web
