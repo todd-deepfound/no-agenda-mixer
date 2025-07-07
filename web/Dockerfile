@@ -15,7 +15,8 @@ RUN pip wheel -r requirements_production.txt -w /wheels
 FROM public.ecr.aws/lambda/python:3.11
 
 # Install ffmpeg from static build (works on any Linux)
-RUN cd /tmp && \
+RUN yum install -y tar xz && \
+    cd /tmp && \
     curl -L https://johnvansickle.com/ffmpeg/releases/ffmpeg-release-amd64-static.tar.xz -o ffmpeg.tar.xz && \
     tar xf ffmpeg.tar.xz && \
     cp ffmpeg-*/ffmpeg /usr/local/bin/ && \
