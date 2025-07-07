@@ -81,11 +81,6 @@ functions:
           path: /mix/history
           method: OPTIONS
           cors: true
-      # Metrics endpoint
-      - httpApi:
-          path: /metrics
-          method: GET
-          cors: true
     environment:
       BUCKET: noagenda-mixer-prod
       GROK_API_KEY: ${env:GROK_API_KEY}
