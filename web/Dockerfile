@@ -3,7 +3,7 @@ FROM public.ecr.aws/lambda/python:3.11 AS build
 
 # System deps for librosa + ffmpeg
 RUN yum install -y gcc gcc-c++ make cmake git \
-    && yum install -y https://dl.fedoraproject.org/pub/epel/epel-release-latest-7.noarch.rpm \
+    && yum install -y https://dl.fedoraproject.org/pub/epel/epel-release-latest-amzn2.noarch.rpm \
     && yum install -y ffmpeg fftw-devel libsndfile libsndfile-devel \
     && pip install --upgrade pip wheel
 
