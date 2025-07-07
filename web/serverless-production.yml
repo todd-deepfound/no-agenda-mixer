@@ -1,0 +1,209 @@
+service: no-agenda-mixer-production
+
+provider:
+  name: aws
+  region: ${opt:region, 'us-east-1'}
+  stage: ${opt:stage, 'prod'}
+  
+  # Container image configuration for real audio processing
+  ecr:
+    images:
+      mixerimg:
+        path: .          # Dockerfile dir
+        file: Dockerfile
+  
+  # IAM permissions for S3 and Secrets Manager
+  iam:
+    role:
+      statements:
+        # S3 permissions for audio file storage
+        - Effect: Allow
+          Action:
+            - s3:GetObject
+            - s3:PutObject
+            - s3:DeleteObject
+            - s3:ListBucket
+          Resource:
+            - arn:aws:s3:::noagenda-mixer-prod
+            - arn:aws:s3:::noagenda-mixer-prod/*
+        # Secrets Manager for API keys
+        - Effect: Allow
+          Action:
+            - secretsmanager:GetSecretValue
+          Resource:
+            - arn:aws:secretsmanager:${self:provider.region}:*:secret:no-agenda-mixer/*
+        # CloudWatch Logs
+        - Effect: Allow
+          Action:
+            - logs:CreateLogGroup
+            - logs:CreateLogStream
+            - logs:PutLogEvents
+          Resource: "*"
+  
+  # Environment variables
+  environment:
+    PYTHONPATH: "/var/runtime:/var/task"
+    STAGE: ${self:provider.stage}
+    LOG_LEVEL: INFO
+
+functions:
+  # Production professional mixer with container image
+  professionalMix:
+    image: mixerimg
+    description: "Production No Agenda professional audio mixer with real processing"
+    memorySize: 2048     # gets ~11 vCPUs on AL2
+    timeout: 60          # 1 minute initial, tune based on measurements
+    events:
+      # Main mixing endpoint
+      - httpApi:
+          path: /mix/professional
+          method: POST
+          cors: true
+      - httpApi:
+          path: /mix/professional
+          method: OPTIONS
+          cors: true
+      # Health check endpoint
+      - httpApi:
+          path: /mix/health
+          method: GET
+          cors: true
+      - httpApi:
+          path: /mix/health
+          method: OPTIONS
+          cors: true
+      # Mix history endpoint
+      - httpApi:
+          path: /mix/history
+          method: GET
+          cors: true
+      - httpApi:
+          path: /mix/history
+          method: OPTIONS
+          cors: true
+      # Metrics endpoint
+      - httpApi:
+          path: /metrics
+          method: GET
+          cors: true
+    environment:
+      BUCKET: noagenda-mixer-prod
+      GROK_API_KEY: ${env:GROK_API_KEY}
+      FAL_API_KEY: ${env:FAL_API_KEY}
+      FFMPEG_BINARY: /usr/bin/ffmpeg   # PyDub override
+      FUNCTION_TYPE: production
+      CONTAINER_MODE: true
+
+  # Lightweight health check function (non-container)
+  health:
+    runtime: python3.11
+    handler: health_check.lambda_handler
+    description: "Lightweight health check for ALB/Lambda probe"
+    memorySize: 256
+    timeout: 30
+    events:
+      - httpApi:
+          path: /health
+          method: GET
+          cors: true
+      - httpApi:
+          path: /health
+          method: OPTIONS
+          cors: true
+    environment:
+      SYSTEM_TYPE: production
+  
+  # Metrics endpoint (non-container)
+  metrics:
+    runtime: python3.11
+    handler: metrics_handler.lambda_handler
+    description: "Metrics endpoint for CloudWatch EMF"
+    memorySize: 256
+    timeout: 30
+    events:
+      - httpApi:
+          path: /metrics
+          method: GET
+          cors: true
+      - httpApi:
+          path: /metrics
+          method: OPTIONS
+          cors: true
+    environment:
+      SYSTEM_TYPE: production
+
+resources:
+  Resources:
+    # S3 bucket for audio storage
+    NoAgendaMixerStorage:
+      Type: AWS::S3::Bucket
+      Properties:
+        BucketName: noagenda-mixer-prod
+        VersioningConfiguration:
+          Status: Enabled
+        LifecycleConfiguration:
+          Rules:
+            # Clean up temporary files after 7 days
+            - Id: CleanupTempFiles
+              Status: Enabled
+              Prefix: temp/
+              ExpirationInDays: 7
+            # Archive old mixes after 90 days
+            - Id: ArchiveOldMixes
+              Status: Enabled
+              Prefix: mixes/
+              Transitions:
+                - TransitionInDays: 90
+                  StorageClass: GLACIER
+        CorsConfiguration:
+          CorsRules:
+            - AllowedHeaders: ['*']
+              AllowedMethods: [GET, PUT, POST, DELETE, HEAD]
+              AllowedOrigins: ['*']
+              MaxAge: 3000
+        PublicAccessBlockConfiguration:
+          BlockPublicAcls: true
+          BlockPublicPolicy: true
+          IgnorePublicAcls: true
+          RestrictPublicBuckets: true
+
+    # CloudWatch Log Group with retention
+    ProfessionalMixerLogGroup:
+      Type: AWS::Logs::LogGroup
+      Properties:
+        LogGroupName: /aws/lambda/no-agenda-mixer-production-${self:provider.stage}-professionalMix
+        RetentionInDays: 30
+
+plugins:
+  - serverless-python-requirements
+
+custom:
+  # Python requirements for health check function only
+  pythonRequirements:
+    dockerizePip: false
+    slim: true
+    strip: false
+    useDownloadCache: true
+    useStaticCache: true
+    fileName: requirements_health.txt
+    layer: false
+
+package:
+  individually: false
+  exclude:
+    - node_modules/**
+    - .git/**
+    - __pycache__/**
+    - "*.pyc"
+    - .env
+    - .dockerignore
+    - requirements_production.txt
+    - Dockerfile
+    - professional_mixer_lite.py
+    - smoke_test*.py
+    - build_and_test.sh
+    - production_test.py
+    - comprehensive_smoke_test.py
+  include:
+    - health_check.py
+    - metrics_handler.py

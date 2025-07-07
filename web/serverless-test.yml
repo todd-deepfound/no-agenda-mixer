@@ -1,0 +1,35 @@
+service: na-mixer-test
+
+provider:
+  name: aws
+  runtime: python3.9
+  stage: ${opt:stage, 'dev'}
+  region: ${opt:region, 'us-east-1'}
+  iam:
+    role:
+      statements:
+        - Effect: Allow
+          Action:
+            - secretsmanager:GetSecretValue
+          Resource:
+            - arn:aws:secretsmanager:${self:provider.region}:*:secret:no-agenda-mixer/*
+
+plugins:
+  - serverless-python-requirements
+
+functions:
+  app:
+    handler: simple_app_fixed.lambda_handler
+    events:
+      - http:
+          path: /
+          method: ANY
+          cors: true
+      - http:
+          path: /{proxy+}
+          method: ANY
+          cors: true
+
+custom:
+  pythonRequirements:
+    dockerizePip: non-linux

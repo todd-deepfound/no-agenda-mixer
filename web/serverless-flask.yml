@@ -1,0 +1,41 @@
+service: na-mixer-flask
+
+provider:
+  name: aws
+  runtime: python3.9
+  stage: ${opt:stage, 'dev'}
+  region: ${opt:region, 'us-east-1'}
+  memorySize: 512
+  timeout: 30
+  environment:
+    STAGE: ${self:provider.stage}
+  iam:
+    role:
+      statements:
+        - Effect: Allow
+          Action:
+            - secretsmanager:GetSecretValue
+          Resource:
+            - arn:aws:secretsmanager:${self:provider.region}:*:secret:no-agenda-mixer/*
+
+functions:
+  app:
+    handler: lambda_minimal.handler
+    events:
+      - http:
+          path: /
+          method: ANY
+          cors: true
+      - http:
+          path: /{proxy+}
+          method: ANY
+          cors: true
+
+custom:
+  pythonRequirements:
+    dockerizePip: false
+    slim: true
+    pythonBin: python3
+
+plugins:
+  - serverless-python-requirements

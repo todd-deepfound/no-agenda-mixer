@@ -1,0 +1,13 @@
+fal_client-0.3.0.dist-info/INSTALLER,sha256=zuuue4knoyJ-UwPPXg8fezS7VCrXJQrAP7zeNuwvFQg,4
+fal_client-0.3.0.dist-info/METADATA,sha256=zO0hd713vRcKC9rVqXx_geV6yyQJhOdfj50dgISs14Q,3013
+fal_client-0.3.0.dist-info/RECORD,,
+fal_client-0.3.0.dist-info/REQUESTED,sha256=47DEQpj8HBSa-_TImW-5JCeuQeRkm5NMpJWZG3hSuFU,0
+fal_client-0.3.0.dist-info/WHEEL,sha256=GJ7t_kWBFywbagK5eo9IoUwLW6oyOeTKmQ-9iHFVNxQ,92
+fal_client-0.3.0.dist-info/top_level.txt,sha256=lBTUJP_azR0EnVMhqidmemBj1S2pr1LnMHnroMjG-Ao,11
+fal_client/__init__.py,sha256=QcsWt-Gu9DBhaONbVKQlruF7RlUttYDX5Ot_XE706Sg,999
+fal_client/__pycache__/__init__.cpython-312.pyc,,
+fal_client/__pycache__/auth.cpython-312.pyc,,
+fal_client/__pycache__/client.cpython-312.pyc,,
+fal_client/auth.py,sha256=N8h0Ae59fsKyAKq7PjtdfuPu5i0E4hDS0DMRWp_ASzw,565
+fal_client/client.py,sha256=1u8188ZcLIE-8f9dMplZ8zP5xBuWwVAYOUQYD9T9yss,14789
+fal_client/py.typed,sha256=47DEQpj8HBSa-_TImW-5JCeuQeRkm5NMpJWZG3hSuFU,0

@@ -1,0 +1,9 @@
+# Production requirements for No Agenda Professional Audio Mixer
+# Pin to wheels that exist on manylinux
+pydub==0.25.1
+librosa==0.10.2
+soundfile==0.12.1
+numpy==1.26.4
+scipy==1.13.1
+boto3
+requests

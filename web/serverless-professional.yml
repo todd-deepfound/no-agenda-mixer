@@ -1,0 +1,184 @@
+service: no-agenda-mixer-pro
+
+provider:
+  name: aws
+  runtime: python3.9
+  stage: ${opt:stage, 'dev'}
+  region: ${opt:region, 'us-east-1'}
+  memorySize: 3008  # Maximum memory for audio processing
+  timeout: 900      # 15 minutes for complex audio processing
+  architecture: x86_64  # Better compatibility with audio libraries
+  
+  # Enhanced IAM permissions for professional mixer
+  iam:
+    role:
+      statements:
+        - Effect: Allow
+          Action:
+            - secretsmanager:GetSecretValue
+          Resource:
+            - arn:aws:secretsmanager:${self:provider.region}:*:secret:no-agenda-mixer/*
+        - Effect: Allow
+          Action:
+            - s3:GetObject
+            - s3:PutObject
+            - s3:DeleteObject
+          Resource:
+            - arn:aws:s3:::no-agenda-mixer-audio/*
+        - Effect: Allow
+          Action:
+            - logs:CreateLogGroup
+            - logs:CreateLogStream
+            - logs:PutLogEvents
+          Resource: "*"
+  
+  # Environment variables for professional processing
+  environment:
+    PYTHONPATH: "/var/runtime:/var/task:/opt/python"
+    NUMBA_CACHE_DIR: "/tmp"
+    MPLCONFIGDIR: "/tmp"
+    HOME: "/tmp"
+    
+plugins:
+  - serverless-python-requirements
+  - serverless-plugin-warmup
+
+custom:
+  # Professional audio processing requirements
+  pythonRequirements:
+    dockerizePip: true  # Required for compiled audio libraries
+    dockerImage: public.ecr.aws/sam/build-python3.9:latest
+    layer: true         # Use layers for large dependencies
+    slim: true          # Remove unnecessary files
+    strip: false        # Keep debugging symbols for audio libs
+    useDownloadCache: true
+    useStaticCache: true
+    pipCmdExtraArgs:
+      - --no-deps
+      - --target /tmp/python
+    noDeploy:
+      - pytest
+      - matplotlib  # Remove heavy visualization (use layer if needed)
+    
+  # Warmup configuration for performance
+  warmup:
+    enabled: true
+    events:
+      - schedule: 'cron(0/5 8-17 ? * MON-FRI *)'  # Keep warm during business hours
+    concurrency: 2
+
+package:
+  individually: true
+  exclude:
+    - "**"
+  include:
+    - professional_mixer.py
+    - requirements_professional.txt
+
+functions:
+  # Main professional mixer function
+  professional-mixer:
+    handler: professional_mixer.lambda_handler
+    description: "Professional No Agenda audio mixer with advanced audio processing"
+    memorySize: 3008
+    timeout: 900
+    reservedConcurrency: 5  # Limit concurrent instances due to memory usage
+    events:
+      - http:
+          path: /mix/professional
+          method: POST
+          cors: true
+      - http:
+          path: /mix/professional
+          method: OPTIONS
+          cors: true
+    layers:
+      - arn:aws:lambda:${self:provider.region}:770693421928:layer:Klayers-p39-ffmpeg:1  # FFmpeg layer
+    environment:
+      STAGE: ${self:provider.stage}
+      LOG_LEVEL: INFO
+  
+  # Lightweight mixer for quick processing
+  quick-mixer:
+    handler: simple_app_fixed.lambda_handler
+    description: "Quick mixer for rapid prototyping"
+    memorySize: 1024
+    timeout: 300
+    events:
+      - http:
+          path: /mix/quick
+          method: POST
+          cors: true
+      - http:
+          path: /mix/quick/{proxy+}
+          method: ANY
+          cors: true
+  
+  # Audio analysis function
+  audio-analyzer:
+    handler: professional_mixer.analyze_audio_lambda
+    description: "Professional audio analysis service"
+    memorySize: 2048
+    timeout: 600
+    events:
+      - http:
+          path: /analyze/audio
+          method: POST
+          cors: true
+
+# S3 bucket for audio storage
+resources:
+  Resources:
+    AudioProcessingBucket:
+      Type: AWS::S3::Bucket
+      Properties:
+        BucketName: no-agenda-mixer-audio-${self:provider.stage}
+        VersioningConfiguration:
+          Status: Enabled
+        PublicAccessBlockConfiguration:
+          BlockPublicAcls: true
+          BlockPublicPolicy: true
+          IgnorePublicAcls: true
+          RestrictPublicBuckets: true
+        CorsConfiguration:
+          CorsRules:
+            - AllowedHeaders: ['*']
+              AllowedMethods: [GET, PUT, POST, DELETE, HEAD]
+              AllowedOrigins: ['*']
+              MaxAge: 3000
+    
+    # CloudFront distribution for audio delivery
+    AudioCDN:
+      Type: AWS::CloudFront::Distribution
+      Properties:
+        DistributionConfig:
+          Origins:
+            - DomainName: !GetAtt AudioProcessingBucket.RegionalDomainName
+              Id: AudioS3Origin
+              S3OriginConfig:
+                OriginAccessIdentity: !Sub 'origin-access-identity/cloudfront/${AudioOAI}'
+          Enabled: true
+          DefaultCacheBehavior:
+            TargetOriginId: AudioS3Origin
+            ViewerProtocolPolicy: redirect-to-https
+            CachePolicyId: 4135ea2d-6df8-44a3-9df3-4b5a84be39ad  # CachingDisabled
+          PriceClass: PriceClass_100
+    
+    AudioOAI:
+      Type: AWS::CloudFront::OriginAccessIdentity
+      Properties:
+        OriginAccessIdentityConfig:
+          Comment: !Sub 'OAI for ${self:service}-${self:provider.stage}'
+
+  Outputs:
+    AudioBucketName:
+      Description: "S3 bucket for audio processing"
+      Value: !Ref AudioProcessingBucket
+      Export:
+        Name: ${self:service}-${self:provider.stage}-audio-bucket
+    
+    AudioCDNDomain:
+      Description: "CloudFront domain for audio delivery"
+      Value: !GetAtt AudioCDN.DomainName
+      Export:
+        Name: ${self:service}-${self:provider.stage}-cdn-domain

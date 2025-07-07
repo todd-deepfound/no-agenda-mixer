@@ -1,0 +1,141 @@
+name: Build & Deploy Mixer
+
+on:
+  push:
+    branches: [ main ]
+  workflow_dispatch:            # Manual trigger from GitHub UI
+
+env:
+  AWS_REGION: us-east-1
+  ECR_REPO: 717984198385.dkr.ecr.us-east-1.amazonaws.com/noagenda-mixer-production
+  AWS_ACCOUNT_ID: 717984198385
+
+jobs:
+  build-and-push:
+    runs-on: ubuntu-latest
+    permissions:
+      id-token: write           # for OIDC auth to AWS
+      contents: read
+
+    steps:
+      - name: ⬇️  Checkout code
+        uses: actions/checkout@v4
+
+      # ---------- Authenticate to AWS -----------
+      # Option 1: Using OIDC (recommended - set up the role first)
+      # - name: 🔑 Configure AWS credentials (OIDC)
+      #   uses: aws-actions/configure-aws-credentials@v4
+      #   with:
+      #     role-to-assume: arn:aws:iam::${{ env.AWS_ACCOUNT_ID }}:role/github-oidc-ecr-push
+      #     aws-region: ${{ env.AWS_REGION }}
+
+      # Option 2: Using secrets (easier to start)
+      - name: 🔑 Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-region: ${{ env.AWS_REGION }}
+
+      - name: 🔐 Login to Amazon ECR
+        id: login-ecr
+        uses: aws-actions/amazon-ecr-login@v2
+
+      # ---------- Build & push Docker image --------------
+      - name: 🐳 Build Docker image
+        working-directory: ./web
+        run: |
+          docker build -t mixer:${{ github.sha }} .
+          docker tag mixer:${{ github.sha }} ${{ env.ECR_REPO }}:${{ github.sha }}
+          docker tag mixer:${{ github.sha }} ${{ env.ECR_REPO }}:latest
+          docker tag mixer:${{ github.sha }} ${{ env.ECR_REPO }}:prod
+
+      - name: 📤 Push images to ECR
+        run: |
+          docker push ${{ env.ECR_REPO }}:${{ github.sha }}
+          docker push ${{ env.ECR_REPO }}:latest
+          docker push ${{ env.ECR_REPO }}:prod
+
+  deploy:
+    needs: build-and-push
+    runs-on: ubuntu-latest
+    permissions:
+      id-token: write
+      contents: read
+      
+    steps:
+      - name: ⬇️  Checkout code
+        uses: actions/checkout@v4
+
+      - name: 📦 Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '18'
+
+      # ---------- Authenticate to AWS -----------
+      # Option 1: Using OIDC (recommended)
+      # - name: 🔑 Configure AWS credentials (OIDC)
+      #   uses: aws-actions/configure-aws-credentials@v4
+      #   with:
+      #     role-to-assume: arn:aws:iam::${{ env.AWS_ACCOUNT_ID }}:role/github-oidc-deploy
+      #     aws-region: ${{ env.AWS_REGION }}
+
+      # Option 2: Using secrets
+      - name: 🔑 Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-region: ${{ env.AWS_REGION }}
+
+      - name: 📦 Install Serverless Framework
+        run: npm install -g serverless
+
+      - name: 📦 Install dependencies
+        working-directory: ./web
+        run: npm install
+
+      - name: ⚡ Deploy with Serverless
+        working-directory: ./web
+        env:
+          GROK_API_KEY: ${{ secrets.GROK_API_KEY }}
+          FAL_API_KEY: ${{ secrets.FAL_API_KEY }}
+        run: |
+          serverless deploy --config serverless-production.yml --stage prod
+
+      - name: 🧪 Run smoke tests
+        working-directory: ./web
+        run: |
+          # Get the deployed API endpoint
+          API_URL=$(serverless info --config serverless-production.yml --stage prod | grep "endpoint:" | head -1 | awk '{print $2}')
+          
+          # Run basic health check
+          echo "Testing health endpoint..."
+          curl -f "$API_URL/health" || echo "Health check endpoint not yet configured"
+          
+          echo ""
+          echo "Testing professional mixer health..."
+          curl -f "$API_URL/mix/health" || echo "Mixer health endpoint pending"
+          
+          echo ""
+          echo "✅ Deployment complete!"
+          echo "🎯 API Endpoint: $API_URL"
+          echo "🎵 Create a mix with:"
+          echo "curl -X POST $API_URL/mix/professional \\"
+          echo "  -H 'Content-Type: application/json' \\"
+          echo "  -d '{\"episode_url\": \"https://op3.dev/e/mp3s.nashownotes.com/NA-1779-2025-07-06-Final.mp3\", \"theme\": \"Best Of\", \"target_duration\": 90}'"
+
+      - name: 📊 Post deployment summary
+        if: success()
+        run: |
+          echo "## 🎉 Deployment Successful!" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "### Container Images:" >> $GITHUB_STEP_SUMMARY
+          echo "- \`${{ env.ECR_REPO }}:${{ github.sha }}\`" >> $GITHUB_STEP_SUMMARY
+          echo "- \`${{ env.ECR_REPO }}:latest\`" >> $GITHUB_STEP_SUMMARY
+          echo "- \`${{ env.ECR_REPO }}:prod\`" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "### Next Steps:" >> $GITHUB_STEP_SUMMARY
+          echo "1. Test the professional mixing endpoint" >> $GITHUB_STEP_SUMMARY
+          echo "2. Monitor CloudWatch logs for processing metrics" >> $GITHUB_STEP_SUMMARY
+          echo "3. Check S3 bucket for generated audio files" >> $GITHUB_STEP_SUMMARY

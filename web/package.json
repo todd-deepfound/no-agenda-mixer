@@ -1,0 +1,19 @@
+{
+  "name": "no-agenda-mixer-web",
+  "version": "1.0.0",
+  "description": "No Agenda AI Mixer Web Interface",
+  "scripts": {
+    "deploy": "serverless deploy",
+    "deploy:prod": "serverless deploy --stage prod",
+    "remove": "serverless remove",
+    "logs": "serverless logs -f app -t",
+    "local": "python app.py"
+  },
+  "devDependencies": {
+    "serverless": "^3.38.0",
+    "serverless-domain-manager": "^7.3.0",
+    "serverless-plugin-cloudfront-lambda-edge": "^2.0.0",
+    "serverless-plugin-warmup": "^8.3.0",
+    "serverless-python-requirements": "^6.1.2"
+  }
+}

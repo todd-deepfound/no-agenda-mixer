@@ -1,0 +1,2 @@
+# Minimal requirements for health check function
+# (No external dependencies needed for basic health check)

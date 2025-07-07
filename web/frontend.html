@@ -1,0 +1,420 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>No Agenda AI Mixer</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" rel="stylesheet">
+    <style>
+        body {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: #fff;
+            min-height: 100vh;
+        }
+        .card {
+            background: rgba(255, 255, 255, 0.1);
+            border: none;
+            backdrop-filter: blur(10px);
+            border-radius: 15px;
+        }
+        .btn-primary {
+            background: linear-gradient(45deg, #ff6b6b, #4ecdc4);
+            border: none;
+            border-radius: 25px;
+            padding: 10px 30px;
+        }
+        .form-control {
+            background: rgba(255, 255, 255, 0.1);
+            border: 1px solid rgba(255, 255, 255, 0.3);
+            color: #fff;
+            border-radius: 10px;
+        }
+        .form-control::placeholder {
+            color: rgba(255, 255, 255, 0.7);
+        }
+        .header {
+            text-align: center;
+            margin: 2rem 0;
+        }
+        .log-container {
+            background: rgba(0, 0, 0, 0.3);
+            border-radius: 10px;
+            padding: 20px;
+            max-height: 400px;
+            overflow-y: auto;
+            font-family: 'Courier New', monospace;
+            font-size: 0.9em;
+        }
+        .status-badge {
+            position: fixed;
+            top: 20px;
+            right: 20px;
+            z-index: 1000;
+        }
+    </style>
+</head>
+<body>
+    <div class="status-badge">
+        <span id="status" class="badge bg-secondary">Ready</span>
+    </div>
+
+    <div class="container mt-5">
+        <div class="header">
+            <h1><i class="fas fa-podcast"></i> No Agenda AI Mixer</h1>
+            <p class="lead">Create AI-powered mixes from No Agenda episodes</p>
+        </div>
+
+        <div class="row">
+            <div class="col-md-4">
+                <div class="card">
+                    <div class="card-header">
+                        <h5><i class="fas fa-sliders-h"></i> Mix Controls</h5>
+                    </div>
+                    <div class="card-body">
+                        <form id="mixForm">
+                            <div class="mb-3">
+                                <label for="episode" class="form-label">Episode Number</label>
+                                <input type="number" class="form-control" id="episode" value="1779" required>
+                            </div>
+                            <div class="mb-3">
+                                <label for="theme" class="form-label">Mix Theme</label>
+                                <select class="form-control" id="theme">
+                                    <option value="Best Of">Best Of</option>
+                                    <option value="Conspiracy Corner">Conspiracy Corner</option>
+                                    <option value="Media Meltdown">Media Meltdown</option>
+                                    <option value="Donation Nation">Donation Nation</option>
+                                    <option value="Custom">Custom Theme</option>
+                                </select>
+                                <input type="text" class="form-control mt-2 d-none" id="customTheme" placeholder="Enter custom theme">
+                            </div>
+                            <button type="submit" class="btn btn-primary w-100" id="startBtn">
+                                <i class="fas fa-rocket"></i> Start Session
+                            </button>
+                        </form>
+
+                        <div id="sessionControls" class="mt-4 d-none">
+                            <h6>Session: <code id="sessionId"></code></h6>
+                            <div class="d-grid gap-2">
+                                <button class="btn btn-success" onclick="generateIdeas()">
+                                    <i class="fas fa-lightbulb"></i> Generate Ideas
+                                </button>
+                                <button class="btn btn-warning" onclick="generateMusic()">
+                                    <i class="fas fa-music"></i> Generate Music
+                                </button>
+                                <button class="btn btn-info" onclick="viewSession()">
+                                    <i class="fas fa-eye"></i> View Details
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="card mt-3">
+                    <div class="card-header">
+                        <h5><i class="fas fa-info-circle"></i> API Status</h5>
+                    </div>
+                    <div class="card-body">
+                        <div id="apiStatus">
+                            <button class="btn btn-outline-light btn-sm" onclick="checkHealth()">
+                                <i class="fas fa-heartbeat"></i> Check Health
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="col-md-8">
+                <div class="card">
+                    <div class="card-header">
+                        <h5><i class="fas fa-terminal"></i> Activity Log</h5>
+                    </div>
+                    <div class="card-body">
+                        <div id="logs" class="log-container">
+                            <div class="text-muted">Ready to create mixes...</div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="card mt-3">
+                    <div class="card-header">
+                        <h5><i class="fas fa-lightbulb"></i> Generated Ideas</h5>
+                    </div>
+                    <div class="card-body">
+                        <div id="ideas">
+                            <div class="text-muted">No ideas generated yet.</div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="card mt-3">
+                    <div class="card-header">
+                        <h5><i class="fas fa-music"></i> AI Generated Music</h5>
+                    </div>
+                    <div class="card-body">
+                        <div id="music">
+                            <div class="text-muted">No music generated yet.</div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+    <script>
+        const API_BASE = 'https://4as1uxx25a.execute-api.us-east-1.amazonaws.com/dev';
+        let currentSessionId = null;
+
+        // Utility functions
+        function log(message, type = 'info') {
+            const logs = document.getElementById('logs');
+            const timestamp = new Date().toLocaleTimeString();
+            const colors = {
+                info: '#4ecdc4',
+                success: '#4ade80',
+                error: '#f87171',
+                warning: '#fbbf24'
+            };
+            
+            logs.innerHTML += `<div style="color: ${colors[type]};">[${timestamp}] ${message}</div>`;
+            logs.scrollTop = logs.scrollHeight;
+        }
+
+        function setStatus(text, type = 'secondary') {
+            const status = document.getElementById('status');
+            status.textContent = text;
+            status.className = `badge bg-${type}`;
+        }
+
+        // Theme selector
+        document.getElementById('theme').addEventListener('change', function() {
+            const customInput = document.getElementById('customTheme');
+            if (this.value === 'Custom') {
+                customInput.classList.remove('d-none');
+            } else {
+                customInput.classList.add('d-none');
+            }
+        });
+
+        // API calls
+        async function apiCall(endpoint, method = 'GET', data = null) {
+            try {
+                const options = {
+                    method,
+                    headers: { 'Content-Type': 'application/json' }
+                };
+                
+                if (data) {
+                    options.body = JSON.stringify(data);
+                }
+                
+                const response = await fetch(`${API_BASE}${endpoint}`, options);
+                const result = await response.json();
+                
+                if (!response.ok) {
+                    throw new Error(result.error || 'API Error');
+                }
+                
+                return result;
+            } catch (error) {
+                log(`API Error: ${error.message}`, 'error');
+                throw error;
+            }
+        }
+
+        // Health check
+        async function checkHealth() {
+            try {
+                setStatus('Checking...', 'warning');
+                const health = await apiCall('/health');
+                log(`Health check: ${health.status}`, 'success');
+                document.getElementById('apiStatus').innerHTML = `
+                    <div class="text-success">✅ API Healthy</div>
+                    <small>GROK: ${health.has_grok_key ? '✅' : '❌'} | FAL: ${health.has_fal_key ? '✅' : '❌'}</small>
+                `;
+                setStatus('Healthy', 'success');
+            } catch (error) {
+                document.getElementById('apiStatus').innerHTML = '<div class="text-danger">❌ API Error</div>';
+                setStatus('Error', 'danger');
+            }
+        }
+
+        // Start session
+        document.getElementById('mixForm').addEventListener('submit', async function(e) {
+            e.preventDefault();
+            
+            const episode = document.getElementById('episode').value;
+            const themeSelect = document.getElementById('theme').value;
+            const customTheme = document.getElementById('customTheme').value;
+            const theme = themeSelect === 'Custom' ? customTheme : themeSelect;
+            
+            try {
+                setStatus('Starting...', 'warning');
+                log(`Starting session for Episode ${episode} - Theme: ${theme}`, 'info');
+                
+                const result = await apiCall('/api/start_session', 'POST', {
+                    episode_number: parseInt(episode),
+                    theme: theme
+                });
+                
+                currentSessionId = result.session_id;
+                document.getElementById('sessionId').textContent = currentSessionId.substring(0, 8) + '...';
+                document.getElementById('sessionControls').classList.remove('d-none');
+                
+                log(`Session started: ${currentSessionId}`, 'success');
+                setStatus('Session Active', 'success');
+                
+            } catch (error) {
+                setStatus('Error', 'danger');
+            }
+        });
+
+        // Generate ideas with GROK AI
+        async function generateIdeas() {
+            if (!currentSessionId) return;
+            
+            try {
+                setStatus('Generating...', 'warning');
+                log('Generating ideas with GROK AI...', 'info');
+                
+                const result = await apiCall(`/api/generate_ideas/${currentSessionId}`, 'POST', {});
+                
+                if (result.status === 'success') {
+                    const ideas = result.ideas;
+                    log(`Ideas generated successfully!`, 'success');
+                    
+                    // Display the ideas
+                    const ideasContainer = document.getElementById('ideas');
+                    if (ideasContainer.textContent.includes('No ideas generated yet')) {
+                        ideasContainer.innerHTML = '';
+                    }
+                    
+                    // Mix Concept
+                    if (ideas.ideas.mix_concept) {
+                        ideasContainer.innerHTML += `
+                            <div class="card mb-3" style="background: rgba(255,255,255,0.1);">
+                                <div class="card-body">
+                                    <h6 class="text-warning"><i class="fas fa-lightbulb"></i> Mix Concept</h6>
+                                    <p style="white-space: pre-wrap; color: #fff;">${ideas.ideas.mix_concept}</p>
+                                </div>
+                            </div>
+                        `;
+                    }
+                    
+                    // Segments
+                    if (ideas.ideas.segments && ideas.ideas.segments.length > 0) {
+                        let segmentsHtml = '<h6 class="text-info"><i class="fas fa-film"></i> Suggested Segments</h6><ul>';
+                        ideas.ideas.segments.forEach(segment => {
+                            segmentsHtml += `<li><strong>${segment.name}</strong> (${segment.timestamp}, ${segment.duration}s)<br><small>${segment.description}</small></li>`;
+                        });
+                        segmentsHtml += '</ul>';
+                        
+                        ideasContainer.innerHTML += `
+                            <div class="card mb-3" style="background: rgba(255,255,255,0.1);">
+                                <div class="card-body">
+                                    ${segmentsHtml}
+                                </div>
+                            </div>
+                        `;
+                    }
+                    
+                    // Music Prompts
+                    if (ideas.ideas.music_prompts && ideas.ideas.music_prompts.length > 0) {
+                        let musicHtml = '<h6 class="text-success"><i class="fas fa-music"></i> AI Music Prompts</h6><ul>';
+                        ideas.ideas.music_prompts.forEach(prompt => {
+                            musicHtml += `<li>${prompt}</li>`;
+                        });
+                        musicHtml += '</ul>';
+                        
+                        ideasContainer.innerHTML += `
+                            <div class="card mb-3" style="background: rgba(255,255,255,0.1);">
+                                <div class="card-body">
+                                    ${musicHtml}
+                                </div>
+                            </div>
+                        `;
+                    }
+                    
+                    ideasContainer.innerHTML += `<small class="text-muted">Generated: ${new Date(ideas.created_at).toLocaleString()}</small>`;
+                    
+                    setStatus('Ideas Ready', 'success');
+                } else {
+                    log('Ideas generation failed', 'error');
+                    setStatus('Error', 'danger');
+                }
+                
+            } catch (error) {
+                log(`Ideas generation error: ${error.message}`, 'error');
+                setStatus('Error', 'danger');
+            }
+        }
+
+        // Generate music with FAL.ai
+        async function generateMusic() {
+            if (!currentSessionId) return;
+            
+            try {
+                setStatus('Generating...', 'warning');
+                log('Generating music with FAL.ai...', 'info');
+                
+                const result = await apiCall(`/api/generate_music/${currentSessionId}`, 'POST', {});
+                
+                if (result.status === 'success') {
+                    const music = result.music;
+                    log(`Music generated: ${music.prompt}`, 'success');
+                    
+                    // Add to music display
+                    const musicContainer = document.getElementById('music');
+                    if (musicContainer.textContent.includes('No music generated yet')) {
+                        musicContainer.innerHTML = '';
+                    }
+                    
+                    musicContainer.innerHTML += `
+                        <div class="card mb-3" style="background: rgba(255,255,255,0.1);">
+                            <div class="card-body">
+                                <h6 class="text-info"><i class="fas fa-music"></i> ${music.status === 'mock' ? 'Mock Music' : 'AI Music'}</h6>
+                                <p><strong>Prompt:</strong> ${music.prompt}</p>
+                                <p><strong>Duration:</strong> ${music.duration} seconds</p>
+                                ${music.audio_url ? `
+                                    <audio controls class="w-100 mt-2">
+                                        <source src="${music.audio_url}" type="audio/mpeg">
+                                        Your browser does not support the audio element.
+                                    </audio>
+                                ` : ''}
+                                ${music.note ? `<small class="text-muted">${music.note}</small>` : ''}
+                                <small class="text-muted d-block mt-2">Generated: ${new Date(music.created_at).toLocaleString()}</small>
+                            </div>
+                        </div>
+                    `;
+                    
+                    setStatus('Music Ready', 'success');
+                } else {
+                    log('Music generation failed', 'error');
+                    setStatus('Error', 'danger');
+                }
+                
+            } catch (error) {
+                log(`Music generation error: ${error.message}`, 'error');
+                setStatus('Error', 'danger');
+            }
+        }
+
+        // View session details
+        async function viewSession() {
+            if (!currentSessionId) return;
+            
+            try {
+                const session = await apiCall(`/api/session/${currentSessionId}`);
+                log(`Session details: ${JSON.stringify(session, null, 2)}`, 'info');
+            } catch (error) {
+                // Error already logged by apiCall
+            }
+        }
+
+        // Initialize
+        log('No Agenda AI Mixer loaded', 'success');
+        checkHealth();
+    </script>
+</body>
+</html>

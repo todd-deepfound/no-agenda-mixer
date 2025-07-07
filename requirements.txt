@@ -1,0 +1,10 @@
+pydub==0.25.1
+requests==2.31.0
+beautifulsoup4==4.12.2
+python-dotenv==1.0.0
+openai==1.30.0
+numpy==1.26.2
+librosa==0.10.1
+soundfile==0.12.1
+aiohttp==3.9.1
+lxml==4.9.3

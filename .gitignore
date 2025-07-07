@@ -1,0 +1,41 @@
+# Python
+__pycache__/
+*.py[cod]
+*.class
+*.so
+.Python
+env/
+venv/
+ENV/
+.venv
+.pytest_cache/
+
+# Node
+node_modules/
+npm-debug.log*
+
+# Environment
+.env
+.env.*
+!.env.example
+
+# AWS
+.aws/
+.serverless/
+
+# OS
+.DS_Store
+
+# Audio files
+*.mp3
+*.wav
+audio/
+clips/
+output/
+temp/
+
+# Logs
+*.log
+
+# Test outputs
+*test_report.json

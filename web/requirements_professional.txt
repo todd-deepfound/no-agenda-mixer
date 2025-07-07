@@ -1,0 +1,45 @@
+# Professional Audio Processing Libraries for No Agenda Mixer
+
+# Core Flask/Web Framework
+Flask==3.0.0
+flask-cors==4.0.0
+mangum==0.17.0
+requests==2.31.0
+
+# Professional Audio Processing
+pedalboard==0.8.7           # Spotify's professional audio effects library
+soundfile==0.12.1           # High-quality audio I/O
+librosa==0.10.1             # Advanced audio analysis and music information retrieval
+ffmpeg-python==0.2.0        # Universal audio format support
+
+# Audio Processing Support
+numpy==1.24.3               # Numerical computing for audio
+scipy==1.11.1               # Scientific computing
+resampy==0.4.2              # High-quality audio resampling
+
+# Utilities
+python-dotenv==1.0.0
+python-json-logger==2.0.7
+beautifulsoup4==4.12.2
+tqdm==4.66.1                # Progress bars for long operations
+
+# AWS Integration
+boto3==1.28.57
+botocore==1.31.57
+
+# AI Integration
+openai==1.30.0
+fal-client==0.3.0
+
+# Data Processing
+pandas==2.0.3               # For audio metadata and analysis
+matplotlib==3.7.2           # For audio visualization (optional)
+
+# Alternative audio libraries (lightweight alternatives)
+pydub==0.25.1               # Simple audio manipulation (fallback)
+aubio==0.4.9                # Real-time audio analysis (optional)
+
+# Note: For Lambda deployment, consider these optimizations:
+# 1. Use Lambda Layers for large libraries (librosa, scipy)
+# 2. Use Container Images for the full stack
+# 3. Consider splitting into microservices for complex processing

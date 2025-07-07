@@ -1,0 +1,432 @@
+{% extends "base.html" %}
+
+{% block title %}Create Mix - No Agenda AI Mixer{% endblock %}
+
+{% block content %}
+<div class="row">
+    <div class="col-md-3">
+        <!-- Control Panel -->
+        <div class="card">
+            <div class="card-header">
+                <h5><i class="fas fa-sliders-h"></i> Mix Controls</h5>
+            </div>
+            <div class="card-body">
+                <form id="sessionForm">
+                    <div class="mb-3">
+                        <label for="episodeNumber" class="form-label">Episode Number</label>
+                        <input type="number" class="form-control" id="episodeNumber" value="1779" required>
+                    </div>
+                    <div class="mb-3">
+                        <label for="theme" class="form-label">Theme</label>
+                        <select class="form-select" id="theme">
+                            <option value="Best Of">Best Of (Default)</option>
+                            <option value="Conspiracy Corner">Conspiracy Corner</option>
+                            <option value="Media Meltdown">Media Meltdown</option>
+                            <option value="Donation Nation">Donation Nation</option>
+                            <option value="Musical Mayhem">Musical Mayhem</option>
+                            <option value="Custom">Custom Theme</option>
+                        </select>
+                        <input type="text" class="form-control mt-2 d-none" id="customTheme" 
+                               placeholder="Enter custom theme">
+                    </div>
+                    <button type="submit" class="btn btn-primary w-100">
+                        <i class="fas fa-rocket"></i> Start Session
+                    </button>
+                </form>
+                
+                <div id="sessionControls" class="d-none mt-4">
+                    <h6>Session: <span id="sessionId" class="text-muted"></span></h6>
+                    <div class="d-grid gap-2">
+                        <button class="btn btn-success" onclick="generateIdeas()">
+                            <i class="fas fa-lightbulb"></i> Generate Ideas
+                        </button>
+                        <button class="btn btn-info" onclick="showMusicGenerator()">
+                            <i class="fas fa-music"></i> Generate Music
+                        </button>
+                        <button class="btn btn-warning" onclick="createMixPlan()">
+                            <i class="fas fa-list"></i> Create Mix Plan
+                        </button>
+                        <button class="btn btn-danger" onclick="produceFinalMix()">
+                            <i class="fas fa-compact-disc"></i> Produce Mix
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Music Generator -->
+        <div class="card mt-3 d-none" id="musicGeneratorCard">
+            <div class="card-header">
+                <h5><i class="fas fa-music"></i> AI Music Generator</h5>
+            </div>
+            <div class="card-body">
+                <div class="mb-3">
+                    <label for="musicPrompt" class="form-label">Music Prompt</label>
+                    <textarea class="form-control" id="musicPrompt" rows="3" 
+                              placeholder="E.g., Upbeat electronic intro with conspiracy theory vibes"></textarea>
+                </div>
+                <div class="mb-3">
+                    <label for="musicDuration" class="form-label">Duration (seconds)</label>
+                    <input type="number" class="form-control" id="musicDuration" value="30" min="5" max="60">
+                </div>
+                <button class="btn btn-info w-100" onclick="generateMusic()">
+                    <i class="fas fa-wand-magic-sparkles"></i> Generate Music
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <div class="col-md-9">
+        <!-- Main Content Area -->
+        <div id="mainContent">
+            <!-- Progress Timeline -->
+            <div class="card" id="progressCard">
+                <div class="card-header">
+                    <h5><i class="fas fa-tasks"></i> Session Progress</h5>
+                </div>
+                <div class="card-body">
+                    <div id="progressTimeline"></div>
+                </div>
+            </div>
+
+            <!-- Ideas Section -->
+            <div class="verbose-section" id="ideasSection">
+                <h4><i class="fas fa-lightbulb"></i> Generated Ideas</h4>
+                <div id="ideasContainer">
+                    <p class="text-muted">No ideas generated yet. Start a session and click "Generate Ideas".</p>
+                </div>
+            </div>
+
+            <!-- Music Generations -->
+            <div class="verbose-section" id="musicSection">
+                <h4><i class="fas fa-music"></i> AI Music Generations</h4>
+                <div id="musicContainer">
+                    <p class="text-muted">No music generated yet.</p>
+                </div>
+            </div>
+
+            <!-- Clips Section -->
+            <div class="verbose-section" id="clipsSection">
+                <h4><i class="fas fa-film"></i> Audio Clips</h4>
+                <div id="clipsContainer">
+                    <p class="text-muted">No clips extracted yet.</p>
+                </div>
+            </div>
+
+            <!-- Mix Plans -->
+            <div class="verbose-section" id="mixPlansSection">
+                <h4><i class="fas fa-list-alt"></i> Mix Plans</h4>
+                <div id="mixPlansContainer">
+                    <p class="text-muted">No mix plans created yet.</p>
+                </div>
+            </div>
+
+            <!-- Logs Section -->
+            <div class="verbose-section" id="logsSection">
+                <h4><i class="fas fa-terminal"></i> Session Logs</h4>
+                <div id="logsContainer" style="max-height: 400px; overflow-y: auto;">
+                    <p class="text-muted">Session logs will appear here...</p>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Loading Modal -->
+<div class="modal fade" id="loadingModal" tabindex="-1" data-bs-backdrop="static">
+    <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content bg-dark">
+            <div class="modal-body text-center">
+                <div class="spinner-border mb-3" role="status">
+                    <span class="visually-hidden">Loading...</span>
+                </div>
+                <p id="loadingMessage">Processing...</p>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+let currentSession = null;
+const loadingModal = new bootstrap.Modal(document.getElementById('loadingModal'));
+
+// Theme selector
+document.getElementById('theme').addEventListener('change', function() {
+    const customThemeInput = document.getElementById('customTheme');
+    if (this.value === 'Custom') {
+        customThemeInput.classList.remove('d-none');
+    } else {
+        customThemeInput.classList.add('d-none');
+    }
+});
+
+// Start session
+document.getElementById('sessionForm').addEventListener('submit', async function(e) {
+    e.preventDefault();
+    
+    const episodeNumber = document.getElementById('episodeNumber').value;
+    const themeSelect = document.getElementById('theme').value;
+    const customTheme = document.getElementById('customTheme').value;
+    const theme = themeSelect === 'Custom' ? customTheme : themeSelect;
+    
+    showLoading('Starting session...');
+    
+    try {
+        const response = await fetch('/api/start_session', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ episode_number: episodeNumber, theme: theme })
+        });
+        
+        const data = await response.json();
+        currentSession = data.session_id;
+        
+        document.getElementById('sessionId').textContent = currentSession.substring(0, 8) + '...';
+        document.getElementById('sessionControls').classList.remove('d-none');
+        
+        addToTimeline('Session Started', `Episode ${episodeNumber} - Theme: ${theme}`);
+        hideLoading();
+        
+        // Start polling for updates
+        startPolling();
+        
+    } catch (error) {
+        hideLoading();
+        alert('Error starting session: ' + error.message);
+    }
+});
+
+// Generate ideas
+async function generateIdeas() {
+    if (!currentSession) return;
+    
+    showLoading('Generating creative ideas with GROK AI...');
+    
+    try {
+        const response = await fetch(`/api/generate_ideas/${currentSession}`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' }
+        });
+        
+        const data = await response.json();
+        hideLoading();
+        
+        if (data.status === 'success') {
+            updateSessionDisplay(data.session);
+            addToTimeline('Ideas Generated', `Generated ${data.ideas_count} creative ideas`);
+        }
+    } catch (error) {
+        hideLoading();
+        alert('Error generating ideas: ' + error.message);
+    }
+}
+
+// Generate music
+function showMusicGenerator() {
+    document.getElementById('musicGeneratorCard').classList.remove('d-none');
+    
+    // Suggest prompts based on theme
+    const theme = document.getElementById('theme').value;
+    const prompts = {
+        'Best Of': 'Upbeat electronic podcast intro with catchy synth melody, 128 BPM',
+        'Conspiracy Corner': 'Dark ambient music with mysterious undertones and glitch effects',
+        'Media Meltdown': 'Chaotic breakbeat with news broadcast samples and distortion',
+        'Donation Nation': 'Celebratory fanfare with cash register sounds and applause',
+        'Musical Mayhem': 'Experimental electronic collage with vocal chops and random beats'
+    };
+    
+    document.getElementById('musicPrompt').placeholder = prompts[theme] || prompts['Best Of'];
+}
+
+async function generateMusic() {
+    if (!currentSession) return;
+    
+    const prompt = document.getElementById('musicPrompt').value || 
+                   document.getElementById('musicPrompt').placeholder;
+    const duration = document.getElementById('musicDuration').value;
+    
+    showLoading('Generating AI music with Fal.ai...');
+    
+    try {
+        const response = await fetch(`/api/generate_music/${currentSession}`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ prompt, duration: parseInt(duration) })
+        });
+        
+        const data = await response.json();
+        hideLoading();
+        
+        if (data.status === 'success') {
+            addToTimeline('Music Generated', prompt);
+            // Refresh display
+            fetchSessionData();
+        }
+    } catch (error) {
+        hideLoading();
+        alert('Error generating music: ' + error.message);
+    }
+}
+
+// Create mix plan
+async function createMixPlan() {
+    if (!currentSession) return;
+    
+    showLoading('Creating detailed mix plan...');
+    
+    try {
+        const response = await fetch(`/api/create_mix_plan/${currentSession}`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({})
+        });
+        
+        const data = await response.json();
+        hideLoading();
+        
+        if (data.status === 'success') {
+            addToTimeline('Mix Plan Created', data.mix_plan.title);
+            fetchSessionData();
+        }
+    } catch (error) {
+        hideLoading();
+        alert('Error creating mix plan: ' + error.message);
+    }
+}
+
+// Update display functions
+function updateSessionDisplay(session) {
+    // Update ideas
+    const ideasContainer = document.getElementById('ideasContainer');
+    if (session.ideas && session.ideas.length > 0) {
+        ideasContainer.innerHTML = session.ideas.map(idea => `
+            <div class="idea-card">
+                <h6 class="text-warning">${idea.type.replace('_', ' ').toUpperCase()}</h6>
+                <pre>${idea.content}</pre>
+                <small class="text-muted">Generated: ${new Date(idea.created_at).toLocaleString()}</small>
+            </div>
+        `).join('');
+    }
+    
+    // Update music generations
+    const musicContainer = document.getElementById('musicContainer');
+    if (session.music_generations && session.music_generations.length > 0) {
+        musicContainer.innerHTML = session.music_generations.map(music => `
+            <div class="music-generation">
+                <h6><i class="fas fa-music"></i> ${music.prompt}</h6>
+                ${music.result.audio_url ? `
+                    <audio controls class="audio-player">
+                        <source src="${music.result.audio_url}" type="audio/mpeg">
+                    </audio>
+                ` : ''}
+                <small class="text-muted">Generated: ${new Date(music.created_at).toLocaleString()}</small>
+            </div>
+        `).join('');
+    }
+    
+    // Update clips
+    const clipsContainer = document.getElementById('clipsContainer');
+    if (session.clips && session.clips.length > 0) {
+        clipsContainer.innerHTML = session.clips.map(clip => `
+            <div class="clip-item">
+                <div>
+                    <strong>${clip.name}</strong>
+                    <span class="text-muted ms-2">${clip.duration}s</span>
+                </div>
+                <button class="btn btn-sm btn-outline-primary">
+                    <i class="fas fa-play"></i>
+                </button>
+            </div>
+        `).join('');
+    }
+    
+    // Update mix plans
+    const mixPlansContainer = document.getElementById('mixPlansContainer');
+    if (session.mix_plans && session.mix_plans.length > 0) {
+        mixPlansContainer.innerHTML = session.mix_plans.map(plan => `
+            <div class="mix-plan-segment">
+                <h5>${plan.title}</h5>
+                <p>${plan.description}</p>
+                <h6>Segments (${plan.segments.length}):</h6>
+                ${plan.segments.map(seg => `
+                    <div class="timeline-item">
+                        <strong>${seg.order}. ${seg.content}</strong><br>
+                        <small>Type: ${seg.type} | Duration: ${seg.duration}s | Effect: ${seg.effects ? seg.effects.join(', ') : 'none'}</small>
+                    </div>
+                `).join('')}
+                <div class="mt-3">
+                    <h6>Production Notes:</h6>
+                    <p class="text-muted">${plan.production_notes}</p>
+                    <h6>Creative Vision:</h6>
+                    <p class="text-info">${plan.creative_vision}</p>
+                </div>
+            </div>
+        `).join('');
+    }
+    
+    // Update logs
+    const logsContainer = document.getElementById('logsContainer');
+    if (session.logs && session.logs.length > 0) {
+        logsContainer.innerHTML = session.logs.map(log => `
+            <div class="log-entry ${log.level}">
+                <small>${new Date(log.timestamp).toLocaleTimeString()}</small>
+                <strong>${log.level.toUpperCase()}</strong>: ${log.message}
+                ${log.data && Object.keys(log.data).length > 0 ? 
+                    `<pre class="mt-1 mb-0">${JSON.stringify(log.data, null, 2)}</pre>` : ''}
+            </div>
+        `).join('');
+        logsContainer.scrollTop = logsContainer.scrollHeight;
+    }
+}
+
+// Helper functions
+function showLoading(message) {
+    document.getElementById('loadingMessage').textContent = message;
+    loadingModal.show();
+}
+
+function hideLoading() {
+    loadingModal.hide();
+}
+
+function addToTimeline(title, description) {
+    const timeline = document.getElementById('progressTimeline');
+    const item = document.createElement('div');
+    item.className = 'timeline-item';
+    item.innerHTML = `
+        <strong>${title}</strong><br>
+        <small class="text-muted">${description}</small>
+    `;
+    timeline.appendChild(item);
+}
+
+// Polling for updates
+let pollInterval;
+function startPolling() {
+    if (pollInterval) clearInterval(pollInterval);
+    
+    pollInterval = setInterval(() => {
+        if (currentSession) fetchSessionData();
+    }, 3000);
+}
+
+async function fetchSessionData() {
+    if (!currentSession) return;
+    
+    try {
+        const response = await fetch(`/api/session/${currentSession}`);
+        const session = await response.json();
+        updateSessionDisplay(session);
+    } catch (error) {
+        console.error('Error fetching session data:', error);
+    }
+}
+
+// Cleanup on page unload
+window.addEventListener('beforeunload', () => {
+    if (pollInterval) clearInterval(pollInterval);
+});
+</script>
+{% endblock %}

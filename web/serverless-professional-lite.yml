@@ -1,0 +1,91 @@
+service: no-agenda-mixer-pro-lite
+
+provider:
+  name: aws
+  runtime: python3.11
+  stage: ${opt:stage, 'dev'}
+  region: ${opt:region, 'us-east-1'}
+  memorySize: 1024  # Start with moderate memory
+  timeout: 300      # 5 minutes for initial testing
+  
+  # Basic IAM permissions
+  iam:
+    role:
+      statements:
+        - Effect: Allow
+          Action:
+            - secretsmanager:GetSecretValue
+          Resource:
+            - arn:aws:secretsmanager:${self:provider.region}:*:secret:no-agenda-mixer/*
+        - Effect: Allow
+          Action:
+            - logs:CreateLogGroup
+            - logs:CreateLogStream
+            - logs:PutLogEvents
+          Resource: "*"
+  
+  # Environment variables
+  environment:
+    PYTHONPATH: "/var/runtime:/var/task"
+    
+plugins:
+  - serverless-python-requirements
+
+custom:
+  # Simplified requirements for testing
+  pythonRequirements:
+    dockerizePip: false  # Skip Docker for now
+    slim: true
+    strip: false
+    useDownloadCache: true
+    useStaticCache: true
+    fileName: requirements_lite.txt
+    layer: false         # Package with function for now
+    pythonBin: python3   # Use system python
+
+package:
+  individually: false
+  exclude:
+    - node_modules/**
+    - .git/**
+    - __pycache__/**
+    - "*.pyc"
+    - .env
+  include:
+    - professional_mixer_lite.py
+
+functions:
+  # Lite professional mixer for testing
+  professional-mixer-lite:
+    handler: professional_mixer_lite.lambda_handler
+    description: "Professional No Agenda audio mixer - lite version for testing"
+    memorySize: 1024
+    timeout: 300
+    events:
+      - http:
+          path: /mix/professional-lite
+          method: POST
+          cors: true
+      - http:
+          path: /mix/professional-lite
+          method: OPTIONS
+          cors: true
+    environment:
+      STAGE: ${self:provider.stage}
+      LOG_LEVEL: INFO
+  
+  # Health check endpoint
+  health-check:
+    handler: simple_app_fixed.lambda_handler
+    description: "Health check for professional system"
+    memorySize: 256
+    timeout: 30
+    events:
+      - http:
+          path: /health-pro
+          method: GET
+          cors: true
+      - http:
+          path: /health-pro
+          method: OPTIONS
+          cors: true

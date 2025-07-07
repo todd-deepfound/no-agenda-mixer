@@ -1,0 +1,75 @@
+service: na-mixer-simple
+
+provider:
+  name: aws
+  runtime: python3.9
+  stage: ${opt:stage, 'dev'}
+  region: ${opt:region, 'us-east-1'}
+  memorySize: 1024
+  timeout: 30
+  environment:
+    S3_BUCKET: na-mixer-${self:provider.stage}
+    STAGE: ${self:provider.stage}
+  iam:
+    role:
+      statements:
+        - Effect: Allow
+          Action:
+            - s3:GetObject
+            - s3:PutObject
+          Resource:
+            - arn:aws:s3:::na-mixer-${self:provider.stage}/*
+        - Effect: Allow
+          Action:
+            - secretsmanager:GetSecretValue
+          Resource:
+            - arn:aws:secretsmanager:${self:provider.region}:*:secret:no-agenda-mixer/*
+
+functions:
+  app:
+    handler: lambda_handler.handler
+    events:
+      - http:
+          path: /
+          method: ANY
+          cors: true
+      - http:
+          path: /{proxy+}
+          method: ANY
+          cors: true
+
+custom:
+  pythonRequirements:
+    dockerizePip: false
+    layer: true
+    slim: true
+    pythonBin: python3
+
+plugins:
+  - serverless-python-requirements
+
+resources:
+  Resources:
+    S3BucketMixer:
+      Type: AWS::S3::Bucket
+      Properties:
+        BucketName: na-mixer-${self:provider.stage}
+        CorsConfiguration:
+          CorsRules:
+            - AllowedHeaders: ['*']
+              AllowedMethods: [GET, PUT, POST]
+              AllowedOrigins: ['*']
+              MaxAge: 3000
+
+  Outputs:
+    ApiUrl:
+      Description: URL of the API endpoint
+      Value:
+        Fn::Join:
+          - ''
+          - - 'https://'
+            - Ref: ApiGatewayRestApi
+            - '.execute-api.'
+            - ${self:provider.region}
+            - '.amazonaws.com/'
+            - ${self:provider.stage}

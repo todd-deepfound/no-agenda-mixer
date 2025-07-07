@@ -1,0 +1,35 @@
+# Docker ignore file for No Agenda Mixer
+node_modules/
+.git/
+.gitignore
+README.md
+.env
+.env.*
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+.pytest_cache/
+.coverage
+htmlcov/
+.tox/
+venv/
+env/
+ENV/
+
+# Development files
+smoke_test*.py
+professional_mixer_lite.py
+serverless-professional-lite.yml
+
+# AWS and build artifacts
+.aws/
+.serverless/
+*.log
+.DS_Store
+Thumbs.db
+
+# Test files
+test_*.py
+*_test.py
+tests/
