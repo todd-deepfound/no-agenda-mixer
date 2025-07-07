@@ -1,11 +1,9 @@
 # ---------- build stage ----------
 FROM public.ecr.aws/lambda/python:3.11 AS build
 
-# System deps for librosa + ffmpeg
-RUN yum install -y gcc gcc-c++ make cmake git \
-    && yum install -y https://dl.fedoraproject.org/pub/epel/epel-release-latest-amzn2.noarch.rpm \
-    && yum install -y ffmpeg fftw-devel libsndfile libsndfile-devel \
-    && pip install --upgrade pip wheel
+# System deps for Python compilation
+RUN yum install -y gcc gcc-c++ make cmake git python3-devel && \
+    pip install --upgrade pip wheel
 
 WORKDIR /opt
 COPY requirements_production.txt .
@@ -16,34 +14,29 @@ RUN pip wheel -r requirements_production.txt -w /wheels
 # ---------- runtime stage ----------
 FROM public.ecr.aws/lambda/python:3.11
 
-# 1. Copy Python deps
+# Install ffmpeg from static build (works on any Linux)
+RUN cd /tmp && \
+    curl -L https://johnvansickle.com/ffmpeg/releases/ffmpeg-release-amd64-static.tar.xz -o ffmpeg.tar.xz && \
+    tar xf ffmpeg.tar.xz && \
+    cp ffmpeg-*/ffmpeg /usr/local/bin/ && \
+    chmod +x /usr/local/bin/ffmpeg && \
+    rm -rf /tmp/ffmpeg*
+
+# Copy Python deps
 COPY --from=build /wheels /opt/python
 
-# 2. Copy ffmpeg binary and required libraries
-COPY --from=build /usr/bin/ffmpeg /usr/bin/ffmpeg
-COPY --from=build /usr/lib64/libavcodec.so* /usr/lib64/
-COPY --from=build /usr/lib64/libavformat.so* /usr/lib64/
-COPY --from=build /usr/lib64/libavutil.so* /usr/lib64/
-COPY --from=build /usr/lib64/libswresample.so* /usr/lib64/
-COPY --from=build /usr/lib64/libswscale.so* /usr/lib64/
-COPY --from=build /usr/lib64/libsndfile.so* /usr/lib64/
-COPY --from=build /usr/lib64/libFLAC.so* /usr/lib64/
-COPY --from=build /usr/lib64/libogg.so* /usr/lib64/
-COPY --from=build /usr/lib64/libvorbis.so* /usr/lib64/
-COPY --from=build /usr/lib64/libvorbisenc.so* /usr/lib64/
-
-# 3. Install Python packages from wheels
+# Install Python packages from wheels
 RUN pip install --no-index --find-links /opt/python \
     pydub librosa soundfile numpy scipy boto3 requests
 
-# 4. Add source
+# Add source
 COPY professional_mixer_production.py ${LAMBDA_TASK_ROOT}/
 COPY audio_processor.py ${LAMBDA_TASK_ROOT}/
 COPY s3_manager.py ${LAMBDA_TASK_ROOT}/
 COPY performance_optimizer.py ${LAMBDA_TASK_ROOT}/
 
-# 5. Set environment variable for PyDub
-ENV FFMPEG_BINARY=/usr/bin/ffmpeg
+# Set environment variable for PyDub
+ENV FFMPEG_BINARY=/usr/local/bin/ffmpeg
 
-# 6. Bootstrap
+# Bootstrap
 CMD ["professional_mixer_production.lambda_handler"]
